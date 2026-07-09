@@ -1,0 +1,27 @@
+# Local secrets
+.env
+**/.env
+
+# Python cache
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+
+# Local authentication database
+auth.db
+auth.db-*
+**/auth.db
+**/auth.db-*
+auth_data.db
+chatbot/auth_data.db
+chatbot/chatbot_data.db
+*.db-wal
+*.db-shm
+
+# Local OS/Office artifacts
+*:Zone.Identifier
+~$*
+
+# Docker/local runtime data
+dashboard-data/

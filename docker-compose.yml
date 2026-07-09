@@ -1,0 +1,20 @@
+services:
+  dashboard:
+    build: .
+    container_name: enterprise-dashboard
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./chatbot/.env
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DASHBOARD_PORT: 8000
+      DASHBOARD_DATA_DIR: /data
+      DASHBOARD_DB_PATH: /data/chatbot_data.db
+      DASHBOARD_AUTH_DB_PATH: /data/auth_data.db
+    volumes:
+      - dashboard-data:/data
+    restart: unless-stopped
+
+volumes:
+  dashboard-data:

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Activity Log · Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">◌</span><div><h1>ACTIVITY MONITOR</h1><p>Recorded system and user activity across the organization</p></div></div></header>
+    <nav class="tabs" aria-label="Dashboard sections"><a href="index.html">Overview</a><a href="departments.html">Departments</a><a href="employees.html">Employees</a><a href="projects.html">Projects</a><a href="tasks.html">Tasks</a><a href="meetings.html">Meetings</a><a href="weekly-updates.html">Weekly Updates</a><a href="activity-log.html" class="active">Activity Log</a><a href="lists.html">Lists</a><a href="admin.html">Admin</a></nav>
+    <section class="kpi-grid" id="kpi-grid"><p class="loading-note">Loading KPIs…</p></section>
+    <div class="chart-row">
+      <section class="panel">
+        <header class="panel-title"><h2>Activity Volume by Week</h2><p>Recorded events over time</p></header>
+        <div id="chart-primary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+      <section class="panel">
+        <header class="panel-title"><h2>Activity by Impact</h2><p>Impact distribution</p></header>
+        <div id="chart-secondary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+    </div>
+    <section class="panel">
+      <header class="panel-title"><h2>All Activity</h2><p>Search by employee, department, project, task, or activity type</p></header>
+      <div id="data-table"><p class="loading-note">Loading data…</p></div>
+    </section>
+  </main>
+
+  <button class="chat-launcher" id="chat-launcher" type="button" aria-label="Open dashboard assistant" aria-expanded="false">⌁</button>
+  <aside class="chat-panel" id="chat-panel" aria-label="Dashboard assistant">
+    <header class="chat-header">
+      <div><strong>Dashboard Assistant</strong><span>Answers from sample_data.xlsx only</span></div>
+      <button class="chat-close" id="chat-close" type="button" aria-label="Close dashboard assistant">×</button>
+    </header>
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <div class="chat-message bot">Ask me about departments, employees, projects, tasks, meetings, weekly updates, or activity data.</div>
+    </div>
+    <div class="chat-quick">
+      <button type="button" data-question="Give me a dashboard overview">Overview</button>
+      <button type="button" data-question="How many tasks are blocked?">Blocked tasks</button>
+      <button type="button" data-question="Summarize the project portfolio">Projects</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" type="text" maxlength="5000" autocomplete="off" placeholder="Ask about this dashboard…" aria-label="Dashboard question">
+      <button type="submit">Send</button>
+    </form>
+  </aside>
+
+  <script src="assets/app.js"></script>
+  <script>
+(async () => {
+  try {
+    const data = await App.fetchData('data_activity_log');
+    const rows = data.rows;
+    function weekStart(dateStr) {
+      const d = new Date(dateStr.slice(0, 10));
+      const day = (d.getUTCDay() + 6) % 7;
+      d.setUTCDate(d.getUTCDate() - day);
+      return d.toISOString().slice(0, 10);
+    }
+    const table = App.dataTable('#data-table', { columns: data.columns, rows, pageSize: 15, pillColumns: ['impact'] });
+    App.filterBar({ columns: data.columns, rows, onChange: render });
+
+    function render(viewRows) {
+      const byType = {};
+      viewRows.forEach(r => byType[r.activity_type] = (byType[r.activity_type] || 0) + 1);
+      const topType = Object.entries(byType).sort((a, b) => b[1] - a[1])[0];
+      const latest = viewRows.reduce((max, r) => r.timestamp > max ? r.timestamp : max, '');
+      App.kpiGrid('#kpi-grid', [
+        { label: 'Total Events', value: viewRows.length, sparkline: App.sparklineSeries(viewRows, 'timestamp') },
+        { label: 'Most Common Activity', value: topType?.[0] || '—', sub: topType ? `${topType[1]} events` : '' },
+        { label: 'Latest Event', value: latest ? latest.replace(' ', ' \u00b7 ') : '—' },
+        { label: 'Departments Involved', value: new Set(viewRows.map(r => r.department)).size },
+      ]);
+      const byWeek = {};
+      viewRows.forEach(r => { const w = weekStart(r.timestamp); byWeek[w] = (byWeek[w] || 0) + 1; });
+      const weeks = Object.keys(byWeek).sort();
+      App.trendChart('#chart-primary', weeks.map(w => ({ label: w.slice(5), value: byWeek[w] })));
+      const byImpact = {};
+      viewRows.forEach(r => byImpact[r.impact] = (byImpact[r.impact] || 0) + 1);
+      App.donutChart('#chart-secondary', ['Low', 'Medium', 'High'].filter(k => byImpact[k]).map(label => ({ label, value: byImpact[label], color: App.pillColor(label) })), 'events', { filterKey: 'impact' });
+      table.setRows(viewRows);
+    }
+  } catch (err) {
+    App.showError('#data-table', err.message);
+  }
+})();
+  </script>
+</body>
+</html>

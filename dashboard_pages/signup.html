@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Sign Up · Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="auth-page">
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">ED</span><div><h1>Enterprise Dashboard</h1><p>Create a verified dashboard account</p></div></div></header>
+    <section class="auth-shell" aria-labelledby="signup-title">
+      <form class="auth-form" method="post">
+        <header class="simple-form-header">
+          <h2 id="signup-title">Create account</h2>
+          <p>Enter your details and verify your email.</p>
+        </header>
+        <label>
+          <span>Full name</span>
+          <input type="text" name="name" autocomplete="name" placeholder="Your name" required>
+        </label>
+        <label>
+          <span>Work email</span>
+          <input type="email" name="email" autocomplete="email" placeholder="name@company.com" required>
+        </label>
+        <label>
+          <span>Password</span>
+          <div class="auth-password-field">
+            <input type="password" name="password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>
+            <button class="auth-password-toggle" type="button" data-toggle-password aria-label="Show password" title="Show password"></button>
+          </div>
+          <div class="password-strength" data-score="0" aria-live="polite"><span class="strength-track"><i></i></span><span data-strength-label>Use at least 8 characters.</span></div>
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <div class="auth-password-field">
+            <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required>
+            <button class="auth-password-toggle" type="button" data-toggle-password aria-label="Show password" title="Show password"></button>
+          </div>
+          <small class="field-feedback" data-feedback="confirm"></small>
+        </label>
+        <label class="auth-check"><input type="checkbox" name="terms" value="1" required><span>I agree to <a href="lists.html">dashboard access policies</a></span></label>
+        <button class="auth-submit" type="submit">Create account</button>
+        <div class="auth-otp" hidden>
+          <label>
+            <span>Email verification code</span>
+            <input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code">
+          </label>
+          <button class="auth-submit auth-verify" type="button">Verify email</button>
+        </div>
+        <p class="auth-status" role="status" aria-live="polite"></p>
+        <p class="auth-switch">Already have an account? <a href="login.html">Login</a></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+const form = document.querySelector(".auth-form");
+const status = document.querySelector(".auth-status");
+const submit = document.querySelector(".auth-form > .auth-submit");
+const otpPanel = document.querySelector(".auth-otp");
+const verifyButton = document.querySelector(".auth-verify");
+const otpInput = document.querySelector('input[name="otp"]');
+const passwordInput = form.elements.password;
+const confirmInput = form.elements.confirm_password;
+const strength = document.querySelector(".password-strength");
+const strengthLabel = document.querySelector("[data-strength-label]");
+const confirmFeedback = document.querySelector('[data-feedback="confirm"]');
+let pendingEmail = "";
+
+document.querySelectorAll("[data-toggle-password]").forEach(button => {
+  button.addEventListener("click", () => {
+    const input = button.closest(".auth-password-field").querySelector("input");
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.dataset.visible = String(show);
+    button.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    button.title = show ? "Hide password" : "Show password";
+  });
+});
+
+function passwordScore(value) {
+  let score = 0;
+  if (value.length >= 8) score += 1;
+  if (/[A-Z]/.test(value) && /[a-z]/.test(value)) score += 1;
+  if (/\d/.test(value) || /[^A-Za-z0-9]/.test(value)) score += 1;
+  return Math.min(score, 3);
+}
+
+function updatePasswordStrength() {
+  const value = passwordInput.value;
+  const score = passwordScore(value);
+  strength.dataset.score = String(score);
+  strengthLabel.textContent = !value ? "Use at least 8 characters." : score <= 1 ? "Weak password" : score === 2 ? "Fair password" : "Strong password";
+}
+
+function updateConfirmFeedback() {
+  if (!confirmInput.value) {
+    confirmFeedback.textContent = "";
+    confirmFeedback.className = "field-feedback";
+    return;
+  }
+  const match = passwordInput.value === confirmInput.value;
+  confirmFeedback.textContent = match ? "✓ Passwords match" : "× Passwords do not match";
+  confirmFeedback.className = `field-feedback ${match ? "ok" : "bad"}`;
+}
+
+passwordInput.addEventListener("input", () => {
+  updatePasswordStrength();
+  updateConfirmFeedback();
+});
+confirmInput.addEventListener("input", updateConfirmFeedback);
+
+async function postJSON(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  status.textContent = "";
+  submit.disabled = true;
+  submit.textContent = "Sending code...";
+  try {
+    const payload = Object.fromEntries(new FormData(form).entries());
+    if (payload.password !== payload.confirm_password) {
+      throw new Error("Passwords do not match");
+    }
+    delete payload.confirm_password;
+    pendingEmail = payload.email;
+    await postJSON("/auth/signup", payload);
+    otpPanel.hidden = false;
+    otpInput.required = true;
+    otpInput.focus();
+    status.textContent = "Verification code sent. Check your email.";
+    submit.textContent = "Resend code";
+  } catch (error) {
+    status.textContent = error.message;
+    submit.textContent = "Create account";
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+verifyButton.addEventListener("click", async () => {
+  status.textContent = "";
+  verifyButton.disabled = true;
+  verifyButton.textContent = "Verifying...";
+  try {
+    await postJSON("/auth/verify-signup", { email: pendingEmail || form.elements.email.value, otp: otpInput.value });
+    location.href = "index.html";
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    verifyButton.disabled = false;
+    verifyButton.textContent = "Verify email";
+  }
+});
+  </script>
+</body>
+</html>

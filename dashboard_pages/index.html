@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">⌂</span><div><h1>EXECUTIVE OVERVIEW</h1><p>Live summary across every workbook sheet</p></div></div></header>
+    <nav class="tabs" aria-label="Dashboard sections"><a href="index.html" class="active">Overview</a><a href="departments.html">Departments</a><a href="employees.html">Employees</a><a href="projects.html">Projects</a><a href="tasks.html">Tasks</a><a href="meetings.html">Meetings</a><a href="weekly-updates.html">Weekly Updates</a><a href="activity-log.html">Activity Log</a><a href="lists.html">Lists</a><a href="admin.html">Admin</a></nav>
+    <section class="kpi-grid" id="kpi-grid"><p class="loading-note">Loading KPIs…</p></section>
+    <div class="chart-row">
+      <section class="panel">
+        <header class="panel-title"><h2>Projects by Status</h2><p>Current project records</p></header>
+        <div id="chart-primary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+      <section class="panel">
+        <header class="panel-title"><h2>Employees by Department</h2><p>Active headcount</p></header>
+        <div id="chart-secondary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+    </div>
+  </main>
+
+  <button class="chat-launcher" id="chat-launcher" type="button" aria-label="Open dashboard assistant" aria-expanded="false">⌁</button>
+  <aside class="chat-panel" id="chat-panel" aria-label="Dashboard assistant">
+    <header class="chat-header">
+      <div><strong>Dashboard Assistant</strong><span>Answers from sample_data.xlsx only</span></div>
+      <button class="chat-close" id="chat-close" type="button" aria-label="Close dashboard assistant">×</button>
+    </header>
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <div class="chat-message bot">Ask me about departments, employees, projects, tasks, meetings, weekly updates, or activity data.</div>
+    </div>
+    <div class="chat-quick">
+      <button type="button" data-question="Give me a dashboard overview">Overview</button>
+      <button type="button" data-question="How many tasks are blocked?">Blocked tasks</button>
+      <button type="button" data-question="Summarize the project portfolio">Projects</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" type="text" maxlength="5000" autocomplete="off" placeholder="Ask about this dashboard…" aria-label="Dashboard question">
+      <button type="submit">Send</button>
+    </form>
+  </aside>
+
+  <script src="assets/app.js"></script>
+  <script>
+(async () => {
+  const tableNames = ['data_departments','data_employees','data_projects','data_tasks','data_meetings','data_activity_log'];
+  try {
+    const [departments, employees, projects, tasks, meetings, activity] = await Promise.all(tableNames.map(App.fetchData));
+    App.filterBar({ columns: projects.columns, rows: projects.rows, onChange: render });
+
+    function render(viewProjects, { activeCount = 0 } = {}) {
+      const isFiltered = activeCount > 0;
+      const projectIds = new Set(viewProjects.map(row => row.project_id));
+      const departmentNames = new Set(viewProjects.map(row => row.department));
+      const scopedDepartments = isFiltered ? departments.rows.filter(row => departmentNames.has(row.department_name)) : departments.rows;
+      const scopedEmployees = isFiltered ? employees.rows.filter(row => departmentNames.has(row.department)) : employees.rows;
+      const scopedTasks = isFiltered ? tasks.rows.filter(row => projectIds.has(row.project_id)) : tasks.rows;
+      const scopedMeetings = isFiltered ? meetings.rows.filter(row => projectIds.has(row.project_id)) : meetings.rows;
+      const scopedActivity = isFiltered ? activity.rows.filter(row => projectIds.has(row.project_id)) : activity.rows;
+      const totalBudget = viewProjects.reduce((s, r) => s + (r.budget_sar || 0), 0);
+      const actualSpend = viewProjects.reduce((s, r) => s + (r.actual_spend_sar || 0), 0);
+      const atRisk = viewProjects.filter(r => r.status === 'At Risk').length;
+      const activeEmployees = scopedEmployees.filter(r => r.employment_status === 'Active').length;
+      const blockedTasks = scopedTasks.filter(r => r.status === 'Blocked').length;
+      const openTasks = scopedTasks.filter(r => r.status !== 'Completed').length;
+      const today = new Date().toISOString().slice(0, 10);
+      const overdueTasks = scopedTasks.filter(r => r.status !== 'Completed' && r.due_date && r.due_date < today).length;
+      const overBudget = viewProjects.filter(r => (r.actual_spend_sar || 0) > (r.budget_sar || 0)).length;
+      const totalHours = scopedMeetings.reduce((s, r) => s + (r.duration_minutes || 0), 0) / 60;
+      const divisions = new Set(scopedDepartments.map(r => r.division)).size;
+      const latestActivity = scopedActivity.reduce((max, r) => r.timestamp > max ? r.timestamp : max, '');
+      App.alertPanel([
+        { count: atRisk, tone: 'warning', title: `${atRisk} at-risk projects`, text: 'Click to filter the portfolio.', filterKey: 'status', filterValue: 'At Risk' },
+        { count: overBudget, tone: 'danger', title: `${overBudget} projects over budget`, text: 'Actual spend is above approved budget.', href: 'projects.html' },
+        { count: blockedTasks, tone: 'danger', title: `${blockedTasks} blocked tasks`, text: 'Blocked work needs attention.', href: 'tasks.html?f_status=Blocked' },
+        { count: overdueTasks, tone: 'warning', title: `${overdueTasks} overdue tasks`, text: 'Open tasks are past their due date.', href: 'tasks.html' },
+      ]);
+      App.kpiGrid('#kpi-grid', [
+        { label: 'Departments', value: scopedDepartments.length, sub: `${divisions} divisions` },
+        { label: 'Employee Records', value: scopedEmployees.length, sub: `${activeEmployees} active`, sparkline: App.sparklineSeries(scopedEmployees, 'hire_date') },
+        { label: 'Projects', value: viewProjects.length, sub: `${atRisk} at risk`, sparkline: App.sparklineSeries(viewProjects, 'start_date') },
+        { label: 'Open Tasks', value: openTasks, sub: `${blockedTasks} blocked`, sparkline: App.sparklineSeries(scopedTasks, 'due_date') },
+        { label: 'Portfolio Budget', value: `SAR ${(totalBudget / 1e6).toFixed(1)}M`, sub: 'approved project budget', sparkline: App.sparklineSeries(viewProjects, 'start_date', 'budget_sar') },
+        { label: 'Actual Spend', value: `SAR ${(actualSpend / 1e6).toFixed(1)}M`, sub: `${totalBudget ? (actualSpend / totalBudget * 100).toFixed(1) : 0}% of budget`, sparkline: App.sparklineSeries(viewProjects, 'start_date', 'actual_spend_sar') },
+        { label: 'Meetings', value: scopedMeetings.length, sub: `${totalHours.toFixed(1)} hours`, sparkline: App.sparklineSeries(scopedMeetings, 'date_time') },
+        { label: 'Activity Events', value: scopedActivity.length, sub: latestActivity ? `latest ${latestActivity}` : '', sparkline: App.sparklineSeries(scopedActivity, 'timestamp') },
+      ]);
+      const byStatus = {};
+      viewProjects.forEach(r => byStatus[r.status] = (byStatus[r.status] || 0) + 1);
+      App.barChart('#chart-primary', Object.entries(byStatus).map(([label, value]) => ({ label, value, color: App.pillColor(label) })).sort((a, b) => b.value - a.value), { filterKey: 'status' });
+      const byDept = {};
+      scopedEmployees.forEach(r => byDept[r.department] = (byDept[r.department] || 0) + 1);
+      App.barChart('#chart-secondary', Object.entries(byDept).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value), { filterKey: 'department' });
+    }
+
+  } catch (err) {
+    App.showError('#kpi-grid', err.message);
+  }
+})();
+  </script>
+</body>
+</html>

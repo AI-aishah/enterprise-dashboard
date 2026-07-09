@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Admin Console</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">ED</span><div><h1>Admin</h1><p>Manage employees and role access</p></div></div></header>
+    <nav class="tabs" aria-label="Dashboard sections"><a href="index.html">Overview</a><a href="departments.html">Departments</a><a href="employees.html">Employees</a><a href="projects.html">Projects</a><a href="tasks.html">Tasks</a><a href="meetings.html">Meetings</a><a href="weekly-updates.html">Weekly Updates</a><a href="activity-log.html">Activity Log</a><a href="lists.html">Lists</a><a href="admin.html" class="active">Admin</a></nav>
+
+    <div class="admin-lock-backdrop" id="admin-lock-backdrop">
+      <section class="panel admin-unlock" id="admin-unlock-panel" role="dialog" aria-modal="true" aria-labelledby="admin-unlock-title">
+        <header class="panel-title"><h2 id="admin-unlock-title">Unlock Admin</h2><p>Required once per session</p></header>
+        <form class="admin-unlock-form" id="admin-unlock-form">
+          <label><span>Password</span><input id="admin-password" type="password" autocomplete="current-password" required></label>
+          <button type="submit">Unlock</button>
+        </form>
+        <p class="auth-status" id="admin-unlock-status" role="status"></p>
+      </section>
+    </div>
+
+    <section class="admin-grid" id="admin-workspace" hidden>
+      <section class="panel admin-editor">
+        <header class="panel-title"><h2 id="admin-form-title">Add Employee</h2><p id="admin-form-mode">Add a row to the Employees sheet</p></header>
+        <form class="admin-user-form" id="admin-user-form">
+          <input type="hidden" id="admin-original-email">
+          <section class="admin-form-section">
+            <h3>Identity</h3>
+            <label><span>Employee ID</span><input id="admin-employee-id" type="text" placeholder="Auto-generated if blank"></label>
+            <div class="admin-field-row">
+              <label><span>Full name</span><input id="admin-name" type="text" autocomplete="name" required></label>
+              <label><span>Email</span><input id="admin-email" type="email" autocomplete="email" required></label>
+            </div>
+          </section>
+          <section class="admin-form-section">
+            <h3>Role and Department</h3>
+            <label><span>Department</span><select id="admin-department" required></select></label>
+            <input type="hidden" id="admin-department-id">
+            <div class="admin-field-row">
+              <label><span>Job title</span><input id="admin-job-title" type="text" placeholder="Employee" required></label>
+              <label><span>Level</span><input id="admin-level" type="text" placeholder="Employee" required></label>
+            </div>
+          </section>
+          <section class="admin-form-section">
+            <h3>Work Details</h3>
+            <div class="admin-field-row">
+              <label><span>Manager</span><input id="admin-manager" type="text" placeholder="Manager name"></label>
+              <label><span>Location</span><input id="admin-location" type="text" placeholder="Remote"></label>
+            </div>
+            <div class="admin-field-row">
+              <label><span>Hire date</span><input id="admin-hire-date" type="date"></label>
+              <label><span>Employment status</span><select id="admin-employment-status" required>
+                <option>Active</option>
+                <option>On Leave</option>
+                <option>Contractor</option>
+                <option>Inactive</option>
+              </select></label>
+            </div>
+          </section>
+          <div class="admin-form-actions">
+            <button type="button" class="auth-secondary" id="admin-cancel-edit" hidden>Cancel</button>
+            <button type="submit" class="auth-submit" id="admin-save-user">Add employee</button>
+          </div>
+        </form>
+        <p class="auth-status" id="admin-form-status" role="status"></p>
+      </section>
+
+      <section class="panel admin-users-panel">
+        <header class="panel-title"><h2>Employees</h2><p><span class="status-chip active" id="admin-user-count">Loading</span></p></header>
+        <div class="table-toolbar">
+          <label class="search-box"><input id="admin-search" type="search" placeholder="Search employees" aria-label="Search employees"></label>
+          <span class="admin-search-meta" id="admin-search-meta">Preparing employee list</span>
+          <div class="table-actions"><button type="button" id="admin-refresh">Refresh</button></div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table admin-users-table">
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Department</th><th>Job Title</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="admin-users-body">
+              <tr class="admin-skeleton-row" aria-hidden="true"><td><span class="admin-skeleton-bar" style="width:52px"></span></td><td><span class="admin-skeleton-bar" style="width:150px"></span></td><td><span class="admin-skeleton-bar" style="width:210px"></span></td><td><span class="admin-skeleton-bar" style="width:140px"></span></td><td><span class="admin-skeleton-bar" style="width:130px"></span></td><td><span class="admin-skeleton-bar" style="width:80px"></span></td><td><span class="admin-skeleton-bar" style="width:110px"></span></td></tr>
+              <tr class="admin-skeleton-row" aria-hidden="true"><td><span class="admin-skeleton-bar" style="width:52px"></span></td><td><span class="admin-skeleton-bar" style="width:150px"></span></td><td><span class="admin-skeleton-bar" style="width:210px"></span></td><td><span class="admin-skeleton-bar" style="width:140px"></span></td><td><span class="admin-skeleton-bar" style="width:130px"></span></td><td><span class="admin-skeleton-bar" style="width:80px"></span></td><td><span class="admin-skeleton-bar" style="width:110px"></span></td></tr>
+              <tr class="admin-skeleton-row" aria-hidden="true"><td><span class="admin-skeleton-bar" style="width:52px"></span></td><td><span class="admin-skeleton-bar" style="width:150px"></span></td><td><span class="admin-skeleton-bar" style="width:210px"></span></td><td><span class="admin-skeleton-bar" style="width:140px"></span></td><td><span class="admin-skeleton-bar" style="width:130px"></span></td><td><span class="admin-skeleton-bar" style="width:80px"></span></td><td><span class="admin-skeleton-bar" style="width:110px"></span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+(() => {
+  const lockBackdrop = document.getElementById("admin-lock-backdrop");
+  const unlockPanel = document.getElementById("admin-unlock-panel");
+  const unlockForm = document.getElementById("admin-unlock-form");
+  const unlockStatus = document.getElementById("admin-unlock-status");
+  const workspace = document.getElementById("admin-workspace");
+  const form = document.getElementById("admin-user-form");
+  const formTitle = document.getElementById("admin-form-title");
+  const formMode = document.getElementById("admin-form-mode");
+  const formStatus = document.getElementById("admin-form-status");
+  const userCount = document.getElementById("admin-user-count");
+  const usersBody = document.getElementById("admin-users-body");
+  const search = document.getElementById("admin-search");
+  const searchMeta = document.getElementById("admin-search-meta");
+  const refresh = document.getElementById("admin-refresh");
+  const cancelEdit = document.getElementById("admin-cancel-edit");
+  const fields = {
+    originalEmail: document.getElementById("admin-original-email"),
+    employeeId: document.getElementById("admin-employee-id"),
+    name: document.getElementById("admin-name"),
+    email: document.getElementById("admin-email"),
+    departmentId: document.getElementById("admin-department-id"),
+    department: document.getElementById("admin-department"),
+    jobTitle: document.getElementById("admin-job-title"),
+    level: document.getElementById("admin-level"),
+    manager: document.getElementById("admin-manager"),
+    location: document.getElementById("admin-location"),
+    hireDate: document.getElementById("admin-hire-date"),
+    employmentStatus: document.getElementById("admin-employment-status"),
+  };
+  const saveButton = document.getElementById("admin-save-user");
+  let users = [];
+  let departments = [];
+  let searchTimer;
+
+  async function request(path, options = {}) {
+    const response = await fetch(path, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      ...options,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
+  }
+
+  function setStatus(node, message, tone = "") {
+    node.textContent = message;
+    if (tone) node.dataset.tone = tone;
+    else delete node.dataset.tone;
+  }
+
+  function resetForm() {
+    fields.originalEmail.value = "";
+    form.reset();
+    fields.employeeId.disabled = false;
+    fields.email.disabled = false;
+    fields.jobTitle.value = "Employee";
+    fields.level.value = "Employee";
+    fields.location.value = "Remote";
+    fields.employmentStatus.value = "Active";
+    updateDepartmentId();
+    formTitle.textContent = "Add Employee";
+    formMode.textContent = "Add a row to the Employees sheet";
+    saveButton.textContent = "Add employee";
+    cancelEdit.hidden = true;
+    setStatus(formStatus, "");
+  }
+
+  function renderSkeletonRows() {
+    userCount.textContent = "Loading";
+    searchMeta.textContent = "Loading employee records";
+    usersBody.innerHTML = Array.from({ length: 7 }, (_, rowIndex) => `
+      <tr class="admin-skeleton-row" aria-hidden="true">
+        ${Array.from({ length: 7 }, (_, columnIndex) => `<td><span class="admin-skeleton-bar" style="width:${[52, 150, 210, 140, 130, 80, 110][columnIndex]}px;max-width:100%"></span></td>`).join("")}
+      </tr>
+    `).join("");
+  }
+
+  function renderTableError(message) {
+    userCount.textContent = "Unavailable";
+    searchMeta.textContent = "Could not load employees";
+    usersBody.innerHTML = `<tr class="empty-row"><td colspan="7"><strong>Unable to load employees</strong><br>${App.escapeHtml(message)}</td></tr>`;
+  }
+
+  function renderDepartments(rows) {
+    departments = rows
+      .map(row => ({ id: row.department_id || "", name: row.department_name || row.department || "" }))
+      .filter(row => row.name)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    fields.department.innerHTML = departments.map(row => `<option value="${App.escapeHtml(row.name)}" data-department-id="${App.escapeHtml(row.id)}">${App.escapeHtml(row.name)}</option>`).join("");
+    updateDepartmentId();
+  }
+
+  function updateDepartmentId() {
+    const selected = fields.department.selectedOptions[0];
+    fields.departmentId.value = selected?.dataset.departmentId || "";
+  }
+
+  function filteredUsers() {
+    const term = search.value.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter(user => [user.employee_name, user.email, user.department, user.job_title, user.level, user.employment_status].some(value => String(value || "").toLowerCase().includes(term)));
+  }
+
+  function renderUsers() {
+    const rows = filteredUsers();
+    userCount.textContent = `${rows.length} of ${users.length}`;
+    searchMeta.textContent = search.value.trim() ? `${rows.length} matching records` : "Search updates as you type";
+    if (!rows.length) {
+      usersBody.innerHTML = `<tr class="empty-row"><td colspan="7"><strong>No employees found</strong><br>Adjust the search or add a new employee record.</td></tr>`;
+      return;
+    }
+    usersBody.innerHTML = rows.map(user => `
+      <tr data-email="${App.escapeHtml(user.email)}">
+        <td>${App.escapeHtml(user.employee_id)}</td>
+        <td>${App.escapeHtml(user.employee_name)}</td>
+        <td>${App.escapeHtml(user.email)}</td>
+        <td>${App.escapeHtml(user.department)}</td>
+        <td>${App.escapeHtml(user.job_title)}</td>
+        <td><span class="status-chip ${String(user.employment_status || "").toLowerCase() === "active" ? "active" : String(user.employment_status || "").toLowerCase().includes("leave") ? "warning" : "inactive"}">${App.escapeHtml(user.employment_status)}</span></td>
+        <td class="admin-row-actions">
+          <button type="button" data-action="edit" aria-label="Edit ${App.escapeHtml(user.employee_name)}" title="Edit">Edit</button>
+          ${user.job_title === "Administrator" && user.level === "Administrator"
+            ? `<button type="button" data-action="remove_admin" aria-label="Remove admin from ${App.escapeHtml(user.employee_name)}" title="Remove admin">Remove admin</button>`
+            : `<button type="button" data-action="make_admin" aria-label="Make ${App.escapeHtml(user.employee_name)} admin" title="Make admin">Make admin</button>`}
+          <button type="button" data-action="delete" aria-label="Delete ${App.escapeHtml(user.employee_name)}" title="Delete">Delete</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  async function loadUsers() {
+    renderSkeletonRows();
+    try {
+      const data = await request("/api/data/data_employees");
+      users = data.rows || [];
+      renderUsers();
+    } catch (error) {
+      renderTableError(error.message);
+    }
+  }
+
+  async function loadDepartments() {
+    try {
+      const data = await request("/api/data/data_departments");
+      renderDepartments(data.rows || []);
+    } catch (_) {
+      fields.department.innerHTML = `<option>Technology</option><option>Finance</option><option>Executive Office</option>`;
+    }
+  }
+
+  async function showWorkspace() {
+    await request("/admin/users");
+    lockBackdrop.hidden = true;
+    workspace.hidden = false;
+    await Promise.all([loadDepartments(), loadUsers()]);
+    resetForm();
+  }
+
+  async function tryExistingUnlock() {
+    try {
+      await showWorkspace();
+    } catch (error) {
+      lockBackdrop.hidden = false;
+      workspace.hidden = true;
+      if (!/Admin password required/i.test(error.message)) setStatus(unlockStatus, error.message);
+    }
+  }
+
+  unlockForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = unlockForm.querySelector("button");
+    button.disabled = true;
+    setStatus(unlockStatus, "");
+    try {
+      await request("/auth/admin-unlock", {
+        method: "POST",
+        body: JSON.stringify({ password: document.getElementById("admin-password").value }),
+      });
+      await showWorkspace();
+    } catch (error) {
+      setStatus(unlockStatus, error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const editing = Boolean(fields.originalEmail.value);
+    saveButton.disabled = true;
+    setStatus(formStatus, "");
+    updateDepartmentId();
+    try {
+      await request("/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          action: editing ? "update" : "create",
+          email: editing ? fields.originalEmail.value : fields.email.value,
+          employee_id: fields.employeeId.value,
+          name: fields.name.value,
+          department_id: fields.departmentId.value,
+          department: fields.department.value,
+          job_title: fields.jobTitle.value,
+          level: fields.level.value,
+          manager: fields.manager.value,
+          location: fields.location.value,
+          hire_date: fields.hireDate.value,
+          employment_status: fields.employmentStatus.value,
+        }),
+      });
+      resetForm();
+      await loadUsers();
+      setStatus(formStatus, editing ? "Employee updated." : "Employee added to the workbook.", "success");
+    } catch (error) {
+      setStatus(formStatus, error.message);
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+
+  usersBody.addEventListener("click", async event => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const email = button.closest("tr").dataset.email;
+    const user = users.find(item => item.email === email);
+    if (!user) return;
+    if (button.dataset.action === "edit") {
+      fields.originalEmail.value = user.email;
+      fields.employeeId.value = user.employee_id || "";
+      fields.employeeId.disabled = true;
+      fields.name.value = user.employee_name || "";
+      fields.email.value = user.email;
+      fields.email.disabled = true;
+      fields.department.value = user.department;
+      updateDepartmentId();
+      fields.jobTitle.value = user.job_title || "Employee";
+      fields.level.value = user.level || "Employee";
+      fields.manager.value = user.manager || "";
+      fields.location.value = user.location || "Remote";
+      fields.hireDate.value = String(user.hire_date || "").slice(0, 10);
+      fields.employmentStatus.value = user.employment_status || "Active";
+      formTitle.textContent = "Update Employee";
+      formMode.textContent = user.email;
+      saveButton.textContent = "Save changes";
+      cancelEdit.hidden = false;
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    button.disabled = true;
+    try {
+      const body = { action: button.dataset.action, email };
+      if (button.dataset.action === "make_admin" || button.dataset.action === "remove_admin") {
+        Object.assign(body, {
+          employee_id: user.employee_id || "",
+          name: user.employee_name || "",
+          department_id: user.department_id || "",
+          department: user.department || "",
+          manager: user.manager || "",
+          location: user.location || "",
+          hire_date: user.hire_date || "",
+          employment_status: user.employment_status || "Active",
+        });
+      }
+      await request("/admin/users", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      await loadUsers();
+      if (button.dataset.action === "make_admin") setStatus(formStatus, "Employee marked as Administrator.", "success");
+      if (button.dataset.action === "remove_admin") setStatus(formStatus, "Admin access removed from employee.", "success");
+    } catch (error) {
+      setStatus(formStatus, error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  cancelEdit.addEventListener("click", resetForm);
+  fields.department.addEventListener("change", updateDepartmentId);
+  refresh.addEventListener("click", loadUsers);
+  search.addEventListener("input", () => {
+    searchMeta.classList.add("searching");
+    searchMeta.textContent = "Filtering";
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchMeta.classList.remove("searching");
+      renderUsers();
+    }, 140);
+  });
+  tryExistingUnlock();
+})();
+  </script>
+</body>
+</html>

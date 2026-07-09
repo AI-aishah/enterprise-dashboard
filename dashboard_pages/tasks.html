@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Tasks · Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">✓</span><div><h1>TASK OPERATIONS</h1><p>Workload, ownership, and completion across all projects</p></div></div></header>
+    <nav class="tabs" aria-label="Dashboard sections"><a href="index.html">Overview</a><a href="departments.html">Departments</a><a href="employees.html">Employees</a><a href="projects.html">Projects</a><a href="tasks.html" class="active">Tasks</a><a href="meetings.html">Meetings</a><a href="weekly-updates.html">Weekly Updates</a><a href="activity-log.html">Activity Log</a><a href="lists.html">Lists</a><a href="admin.html">Admin</a></nav>
+    <section class="kpi-grid" id="kpi-grid"><p class="loading-note">Loading KPIs…</p></section>
+    <div class="chart-row">
+      <section class="panel">
+        <header class="panel-title"><h2>Tasks by Status</h2><p>Current task records</p></header>
+        <div id="chart-primary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+      <section class="panel">
+        <header class="panel-title"><h2>Tasks by Priority</h2><p>Priority distribution</p></header>
+        <div id="chart-secondary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+    </div>
+    <section class="panel">
+      <header class="panel-title"><h2>All Tasks</h2><p>Search by task, project, assignee, department, status, or priority</p></header>
+      <div id="data-table"><p class="loading-note">Loading data…</p></div>
+    </section>
+  </main>
+
+  <button class="chat-launcher" id="chat-launcher" type="button" aria-label="Open dashboard assistant" aria-expanded="false">⌁</button>
+  <aside class="chat-panel" id="chat-panel" aria-label="Dashboard assistant">
+    <header class="chat-header">
+      <div><strong>Dashboard Assistant</strong><span>Answers from sample_data.xlsx only</span></div>
+      <button class="chat-close" id="chat-close" type="button" aria-label="Close dashboard assistant">×</button>
+    </header>
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <div class="chat-message bot">Ask me about departments, employees, projects, tasks, meetings, weekly updates, or activity data.</div>
+    </div>
+    <div class="chat-quick">
+      <button type="button" data-question="Give me a dashboard overview">Overview</button>
+      <button type="button" data-question="How many tasks are blocked?">Blocked tasks</button>
+      <button type="button" data-question="Summarize the project portfolio">Projects</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" type="text" maxlength="5000" autocomplete="off" placeholder="Ask about this dashboard…" aria-label="Dashboard question">
+      <button type="submit">Send</button>
+    </form>
+  </aside>
+
+  <script src="assets/app.js"></script>
+  <script>
+(async () => {
+  try {
+    const data = await App.fetchData('data_tasks');
+    const rows = data.rows;
+    const table = App.dataTable('#data-table', { columns: data.columns, rows, pageSize: 15, pillColumns: ['status', 'priority'] });
+    App.filterBar({ columns: data.columns, rows, onChange: render });
+
+    function render(viewRows) {
+      const blocked = viewRows.filter(r => r.status === 'Blocked').length;
+      const completed = viewRows.filter(r => r.status === 'Completed').length;
+      const percent = value => viewRows.length ? (value / viewRows.length * 100).toFixed(1) : '0.0';
+      const avgCompletion = viewRows.length ? viewRows.reduce((s, r) => s + (r.completion || 0), 0) / viewRows.length : 0;
+      const today = new Date().toISOString().slice(0, 10);
+      const overdue = viewRows.filter(r => r.status !== 'Completed' && r.due_date && r.due_date < today).length;
+      App.alertPanel([
+        { count: blocked, tone: 'danger', title: `${blocked} blocked tasks`, text: 'Click to show blocked work.', filterKey: 'status', filterValue: 'Blocked' },
+        { count: overdue, tone: 'warning', title: `${overdue} overdue tasks`, text: 'Open tasks are past their due date.' },
+      ]);
+      App.kpiGrid('#kpi-grid', [
+        { label: 'Total Tasks', value: viewRows.length, sparkline: App.sparklineSeries(viewRows, 'due_date') },
+        { label: 'Blocked', value: blocked, sub: `${percent(blocked)}% of tasks`, sparkline: App.sparklineSeries(viewRows.filter(r => r.status === 'Blocked'), 'due_date') },
+        { label: 'Completed', value: completed, sub: `${percent(completed)}% of tasks`, sparkline: App.sparklineSeries(viewRows.filter(r => r.status === 'Completed'), 'due_date') },
+        { label: 'Avg. Completion', value: `${avgCompletion.toFixed(0)}%`, progress: avgCompletion, sparkline: App.sparklineSeries(viewRows, 'due_date', 'completion') },
+      ]);
+      const byStatus = {};
+      viewRows.forEach(r => byStatus[r.status] = (byStatus[r.status] || 0) + 1);
+      App.donutChart('#chart-primary', Object.entries(byStatus).map(([label, value]) => ({ label, value, color: App.pillColor(label) })), 'tasks', { filterKey: 'status' });
+      const byPriority = {};
+      viewRows.forEach(r => byPriority[r.priority] = (byPriority[r.priority] || 0) + 1);
+      App.barChart('#chart-secondary', ['Low', 'Medium', 'High', 'Critical'].filter(k => byPriority[k]).map(label => ({ label, value: byPriority[label], color: App.pillColor(label) })), { filterKey: 'priority' });
+      table.setRows(viewRows);
+    }
+  } catch (err) {
+    App.showError('#data-table', err.message);
+  }
+})();
+  </script>
+</body>
+</html>

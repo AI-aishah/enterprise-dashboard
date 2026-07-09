@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Weekly Updates · Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">↗</span><div><h1>WEEKLY PERFORMANCE</h1><p>Progress and health reported per project, per week</p></div></div></header>
+    <nav class="tabs" aria-label="Dashboard sections"><a href="index.html">Overview</a><a href="departments.html">Departments</a><a href="employees.html">Employees</a><a href="projects.html">Projects</a><a href="tasks.html">Tasks</a><a href="meetings.html">Meetings</a><a href="weekly-updates.html" class="active">Weekly Updates</a><a href="activity-log.html">Activity Log</a><a href="lists.html">Lists</a><a href="admin.html">Admin</a></nav>
+    <section class="kpi-grid" id="kpi-grid"><p class="loading-note">Loading KPIs…</p></section>
+    <div class="chart-row">
+      <section class="panel">
+        <header class="panel-title"><h2>Average Progress by Week</h2><p>Reported progress % over time</p></header>
+        <div id="chart-primary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+      <section class="panel">
+        <header class="panel-title"><h2>Health Distribution</h2><p>Across all updates</p></header>
+        <div id="chart-secondary"><p class="loading-note">Loading chart…</p></div>
+      </section>
+    </div>
+    <section class="panel">
+      <header class="panel-title"><h2>All Weekly Updates</h2><p>Search by project, department, health, status, blocker, or next step</p></header>
+      <div id="data-table"><p class="loading-note">Loading data…</p></div>
+    </section>
+  </main>
+
+  <button class="chat-launcher" id="chat-launcher" type="button" aria-label="Open dashboard assistant" aria-expanded="false">⌁</button>
+  <aside class="chat-panel" id="chat-panel" aria-label="Dashboard assistant">
+    <header class="chat-header">
+      <div><strong>Dashboard Assistant</strong><span>Answers from sample_data.xlsx only</span></div>
+      <button class="chat-close" id="chat-close" type="button" aria-label="Close dashboard assistant">×</button>
+    </header>
+    <div class="chat-messages" id="chat-messages" aria-live="polite">
+      <div class="chat-message bot">Ask me about departments, employees, projects, tasks, meetings, weekly updates, or activity data.</div>
+    </div>
+    <div class="chat-quick">
+      <button type="button" data-question="Give me a dashboard overview">Overview</button>
+      <button type="button" data-question="How many tasks are blocked?">Blocked tasks</button>
+      <button type="button" data-question="Summarize the project portfolio">Projects</button>
+    </div>
+    <form class="chat-form" id="chat-form">
+      <input id="chat-input" type="text" maxlength="5000" autocomplete="off" placeholder="Ask about this dashboard…" aria-label="Dashboard question">
+      <button type="submit">Send</button>
+    </form>
+  </aside>
+
+  <script src="assets/app.js"></script>
+  <script>
+(async () => {
+  try {
+    const data = await App.fetchData('data_weekly_updates');
+    const rows = data.rows;
+    const table = App.dataTable('#data-table', { columns: data.columns, rows, pageSize: 15, pillColumns: ['health', 'status'] });
+    App.filterBar({ columns: data.columns, rows, onChange: render });
+
+    function render(viewRows) {
+      const red = viewRows.filter(r => r.health === 'Red').length;
+      const green = viewRows.filter(r => r.health === 'Green').length;
+      const percent = value => viewRows.length ? (value / viewRows.length * 100).toFixed(1) : '0.0';
+      const avgProgress = viewRows.length ? viewRows.reduce((s, r) => s + (r.progress || 0), 0) / viewRows.length : 0;
+      App.alertPanel([
+        { count: red, tone: 'danger', title: `${red} red-health updates`, text: 'Click to show updates requiring attention.', filterKey: 'health', filterValue: 'Red' },
+      ]);
+      App.kpiGrid('#kpi-grid', [
+        { label: 'Total Updates', value: viewRows.length, sparkline: App.sparklineSeries(viewRows, 'week_starting') },
+        { label: 'Green Health', value: green, sub: `${percent(green)}%`, sparkline: App.sparklineSeries(viewRows.filter(r => r.health === 'Green'), 'week_starting') },
+        { label: 'Red Health', value: red, sub: `${percent(red)}%`, sparkline: App.sparklineSeries(viewRows.filter(r => r.health === 'Red'), 'week_starting') },
+        { label: 'Avg. Progress', value: `${avgProgress.toFixed(0)}%`, progress: avgProgress, sparkline: App.sparklineSeries(viewRows, 'week_starting', 'progress') },
+      ]);
+      const byWeek = {};
+      viewRows.forEach(r => { (byWeek[r.week_starting] ||= []).push(r.progress || 0); });
+      const weeks = Object.keys(byWeek).sort();
+      App.trendChart('#chart-primary', weeks.map(w => ({ label: w.slice(5), value: byWeek[w].reduce((a, b) => a + b, 0) / byWeek[w].length })));
+      const byHealth = {};
+      viewRows.forEach(r => byHealth[r.health] = (byHealth[r.health] || 0) + 1);
+      App.donutChart('#chart-secondary', ['Green', 'Amber', 'Red'].filter(k => byHealth[k]).map(label => ({ label, value: byHealth[label], color: App.pillColor(label) })), 'updates', { filterKey: 'health' });
+      table.setRows(viewRows);
+    }
+  } catch (err) {
+    App.showError('#data-table', err.message);
+  }
+})();
+  </script>
+</body>
+</html>

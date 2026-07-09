@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="dashboard-api" content="">
+  <title>Login · Enterprise Overview</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body class="auth-page">
+  <main>
+    <header class="topbar"><div class="section-heading"><span class="section-icon" aria-hidden="true">ED</span><div><h1>Enterprise Dashboard</h1><p>Access your team's dashboard in one place</p></div></div></header>
+    <section class="auth-shell" aria-labelledby="login-title">
+      <form class="auth-form" method="post">
+        <header class="simple-form-header">
+          <h2 id="login-title">Sign in</h2>
+          <p>Use your dashboard account.</p>
+        </header>
+        <label>
+          <span>Email address</span>
+          <input type="email" name="email" autocomplete="email" placeholder="name@company.com" required>
+          <small class="field-feedback" data-feedback="email"></small>
+        </label>
+        <label>
+          <span>Password</span>
+          <div class="auth-password-field">
+            <input type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required>
+            <button class="auth-password-toggle" type="button" data-toggle-password aria-label="Show password" title="Show password"></button>
+          </div>
+          <small class="field-feedback" data-feedback="password"></small>
+        </label>
+        <div class="auth-row">
+          <label class="auth-check"><input type="checkbox" name="remember" value="1"><span>Remember this device</span></label>
+          <button class="auth-text-button" type="button" data-forgot-password>Forgot password?</button>
+        </div>
+        <button class="auth-submit" type="submit">Login</button>
+        <div class="auth-reset" hidden>
+          <label>
+            <span>Reset email</span>
+            <input type="email" name="reset_email" autocomplete="email" placeholder="name@company.com">
+          </label>
+          <button class="auth-secondary" type="button" data-send-reset>Send reset code</button>
+          <div class="auth-reset-fields" hidden>
+            <label>
+              <span>Verification code</span>
+              <input type="text" name="reset_otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit code">
+            </label>
+            <label>
+              <span>New password</span>
+              <div class="auth-password-field">
+                <input type="password" name="reset_password" autocomplete="new-password" minlength="8" placeholder="At least 8 characters">
+                <button class="auth-password-toggle" type="button" data-toggle-password aria-label="Show password" title="Show password"></button>
+              </div>
+            </label>
+            <button class="auth-submit" type="button" data-reset-password>Update password</button>
+          </div>
+          <button class="auth-text-button" type="button" data-cancel-reset>Back to login</button>
+        </div>
+        <p class="auth-status" role="status" aria-live="polite"></p>
+        <p class="auth-switch">New to the dashboard? <a href="signup.html">Sign up</a></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="assets/app.js"></script>
+  <script>
+const form = document.querySelector(".auth-form");
+const status = document.querySelector(".auth-status");
+const submit = document.querySelector(".auth-submit");
+const emailFeedback = document.querySelector('[data-feedback="email"]');
+const passwordFeedback = document.querySelector('[data-feedback="password"]');
+const forgotButton = document.querySelector("[data-forgot-password]");
+const resetPanel = document.querySelector(".auth-reset");
+const resetFields = document.querySelector(".auth-reset-fields");
+const resetEmail = document.querySelector('input[name="reset_email"]');
+const resetOtp = document.querySelector('input[name="reset_otp"]');
+const resetPassword = document.querySelector('input[name="reset_password"]');
+const sendResetButton = document.querySelector("[data-send-reset]");
+const resetPasswordButton = document.querySelector("[data-reset-password]");
+const cancelResetButton = document.querySelector("[data-cancel-reset]");
+const next = new URLSearchParams(location.search).get("next") || "index.html";
+
+function setStatus(message, tone = "error") {
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
+function setFeedback(node, message, tone = "") {
+  node.textContent = message;
+  node.className = `field-feedback ${tone}`.trim();
+}
+
+function validateLoginFields() {
+  const email = form.elements.email.value.trim();
+  const password = form.elements.password.value;
+  let valid = true;
+  if (!email) {
+    setFeedback(emailFeedback, "Email is required.", "bad");
+    valid = false;
+  } else if (!form.elements.email.validity.valid) {
+    setFeedback(emailFeedback, "Enter a valid email address.", "bad");
+    valid = false;
+  } else {
+    setFeedback(emailFeedback, "Email looks valid.", "ok");
+  }
+  if (!password) {
+    setFeedback(passwordFeedback, "Password is required.", "bad");
+    valid = false;
+  } else {
+    setFeedback(passwordFeedback, "");
+  }
+  return valid;
+}
+
+document.querySelectorAll("[data-toggle-password]").forEach(button => {
+  button.addEventListener("click", () => {
+    const input = button.closest(".auth-password-field").querySelector("input");
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    button.dataset.visible = String(show);
+    button.setAttribute("aria-label", show ? "Hide password" : "Show password");
+    button.title = show ? "Hide password" : "Show password";
+  });
+});
+
+async function postJSON(url, body) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+form.addEventListener("submit", async event => {
+  event.preventDefault();
+  setStatus("", "error");
+  if (!validateLoginFields()) return;
+  submit.disabled = true;
+  submit.textContent = "Logging in...";
+  try {
+    const payload = Object.fromEntries(new FormData(form).entries());
+    await postJSON("/auth/login", payload);
+    location.href = next;
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = "Login";
+  }
+});
+
+form.elements.email.addEventListener("input", () => {
+  if (emailFeedback.textContent) validateLoginFields();
+});
+form.elements.password.addEventListener("input", () => {
+  if (passwordFeedback.textContent) validateLoginFields();
+});
+
+forgotButton.addEventListener("click", () => {
+  setStatus("", "error");
+  resetPanel.hidden = false;
+  resetFields.hidden = true;
+  resetEmail.value = form.elements.email.value;
+  resetEmail.required = true;
+  resetOtp.required = false;
+  resetPassword.required = false;
+  resetEmail.focus();
+});
+
+cancelResetButton.addEventListener("click", () => {
+  setStatus("", "error");
+  resetPanel.hidden = true;
+  resetFields.hidden = true;
+  resetEmail.required = false;
+  resetOtp.required = false;
+  resetPassword.required = false;
+});
+
+sendResetButton.addEventListener("click", async () => {
+  setStatus("", "error");
+  sendResetButton.disabled = true;
+  sendResetButton.textContent = "Sending code...";
+  try {
+    await postJSON("/auth/request-password-reset", { email: resetEmail.value });
+    resetFields.hidden = false;
+    resetOtp.required = true;
+    resetPassword.required = true;
+    resetOtp.focus();
+    setStatus("Reset code sent. Check your email.", "success");
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    sendResetButton.disabled = false;
+    sendResetButton.textContent = "Send reset code";
+  }
+});
+
+resetPasswordButton.addEventListener("click", async () => {
+  setStatus("", "error");
+  resetPasswordButton.disabled = true;
+  resetPasswordButton.textContent = "Updating...";
+  try {
+    await postJSON("/auth/reset-password", {
+      email: resetEmail.value,
+      otp: resetOtp.value,
+      password: resetPassword.value,
+    });
+    resetPanel.hidden = true;
+    resetFields.hidden = true;
+    form.elements.email.value = resetEmail.value;
+    form.elements.password.value = "";
+    setStatus("Password updated. Login with your new password.", "success");
+    form.elements.password.focus();
+  } catch (error) {
+    setStatus(error.message);
+  } finally {
+    resetPasswordButton.disabled = false;
+    resetPasswordButton.textContent = "Update password";
+  }
+});
+  </script>
+</body>
+</html>
