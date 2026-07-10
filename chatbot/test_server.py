@@ -80,23 +80,27 @@ class WorkbookQueryTests(unittest.TestCase):
         self.assertEqual(user["role"], expected["role"])
         self.delete_auth_user("fatimah.alzahrani@example-company.com")
 
-    @patch.object(server, "AISHAH_ADMIN_EMAILS", {"aishah.test@example.com"})
+    def test_signup_rejects_placeholder_email_domains(self):
+        with self.assertRaisesRegex(ValueError, "real email address"):
+            server.signup_user("Aishah", "aishah@example.com", "secure-password")
+
+    @patch.object(server, "AISHAH_ADMIN_EMAILS", {"aishah.test@company.com"})
     @patch("server.send_otp_email")
     @patch("server.generate_otp", return_value="123456")
     def test_aishah_signup_is_forced_to_admin(self, generate_otp, send_email):
-        self.delete_auth_user("aishah.test@example.com")
+        self.delete_auth_user("aishah.test@company.com")
         server.OTP_STORE.clear()
-        server.signup_user("AishahAbunaja", "aishah.test@example.com", "secure-password")
-        self.assertTrue(server.verify_signup_otp("aishah.test@example.com", "123456"))
-        user = server.authenticate_user("aishah.test@example.com", "secure-password")
+        server.signup_user("AishahAbunaja", "aishah.test@company.com", "secure-password")
+        self.assertTrue(server.verify_signup_otp("aishah.test@company.com", "123456"))
+        user = server.authenticate_user("aishah.test@company.com", "secure-password")
         self.assertIsNotNone(user)
         self.assertEqual(user["role"], "Administrator")
-        self.delete_auth_user("aishah.test@example.com")
+        self.delete_auth_user("aishah.test@company.com")
 
     def test_signup_rejects_people_missing_from_employee_sheet(self):
-        self.delete_auth_user("not.in.workbook@example.com")
+        self.delete_auth_user("not.in.workbook@company.com")
         with self.assertRaisesRegex(ValueError, "employee record was not found"):
-            server.signup_user("Missing Person", "not.in.workbook@example.com", "secure-password")
+            server.signup_user("Missing Person", "not.in.workbook@company.com", "secure-password")
 
     def test_role_navigation_rules_hide_disallowed_pages(self):
         self.assertIn("activity-log.html", server.allowed_pages({"role": "Administrator"}))

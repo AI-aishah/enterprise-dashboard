@@ -23,6 +23,7 @@
         <label>
           <span>Work email</span>
           <input type="email" name="email" autocomplete="email" placeholder="name@company.com" required>
+          <small class="field-feedback" data-feedback="email">Use your real work email; example.com addresses are not accepted.</small>
         </label>
         <label>
           <span>Password</span>
@@ -132,6 +133,10 @@ form.addEventListener("submit", async event => {
   submit.textContent = "Sending code...";
   try {
     const payload = Object.fromEntries(new FormData(form).entries());
+    const emailDomain = payload.email.trim().toLowerCase().split("@").pop();
+    if (["example.com", "example.org", "example.net"].includes(emailDomain)) {
+      throw new Error("Enter a real email address; example.com addresses cannot be used");
+    }
     if (payload.password !== payload.confirm_password) {
       throw new Error("Passwords do not match");
     }

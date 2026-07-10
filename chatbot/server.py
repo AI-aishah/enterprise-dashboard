@@ -164,6 +164,15 @@ def normalize_email(email: str) -> str:
     return normalized
 
 
+def validate_signup_email(email: str) -> str:
+    """Return a normalized signup email after rejecting placeholder domains."""
+    normalized = normalize_email(email)
+    domain = normalized.rsplit("@", 1)[1]
+    if domain in {"example.com", "example.org", "example.net"}:
+        raise ValueError("Enter a real email address; example.com addresses cannot be used")
+    return normalized
+
+
 def generate_otp() -> str:
     upper = 10 ** OTP_LENGTH
     return f"{secrets.randbelow(upper):0{OTP_LENGTH}d}"
@@ -355,7 +364,8 @@ def create_user_with_password(name: str, email: str, password: str, department: 
 
 
 def signup_user(name: str, email: str, password: str) -> None:
-    profile = signup_profile_from_workbook(name, email)
+    validated_email = validate_signup_email(email)
+    profile = signup_profile_from_workbook(name, validated_email)
     normalized_email = profile["email"]
     if user_by_email(normalized_email):
         raise ValueError("An account already exists for this email")
