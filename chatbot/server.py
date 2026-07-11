@@ -616,7 +616,9 @@ def find_workspace() -> Path:
 
 WORKSPACE = find_workspace()
 WORKBOOK_PATH = WORKSPACE / "sample_data.xlsx"
-PAGES_DIR = WORKSPACE / "dashboard_pages"
+# Static pages remain in the deployed project bundle. WORKSPACE may point to
+# /tmp on serverless hosts so the workbook and databases can be writable.
+PAGES_DIR = APP_DIR.parent / "dashboard_pages"
 DASHBOARD_PATH = PAGES_DIR / "index.html"
 STATIC_CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
