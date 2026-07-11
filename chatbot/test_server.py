@@ -180,6 +180,31 @@ class WorkbookQueryTests(unittest.TestCase):
         self.assertIsNone(server.session_user(token))
         self.delete_auth_user("session.user@example.com")
 
+    @patch.dict("server.os.environ", {"SESSION_SECRET": "test-shared-secret"})
+    def test_signed_session_survives_without_in_memory_state(self):
+        self.delete_auth_user("signed.user@example.com")
+        server.create_user("Signed User", "signed.user@example.com", server.hash_password("secure-password"), "Technology")
+        token = server.create_session("signed.user@example.com")
+        server.SESSIONS.clear()
+
+        user = server.session_user(token)
+        self.assertEqual(user["email"], "signed.user@example.com")
+        self.assertEqual(user["department"], "Technology")
+        self.assertIsNone(server.session_user(token + "tampered"))
+        self.delete_auth_user("signed.user@example.com")
+
+    @patch.dict("server.os.environ", {"SESSION_SECRET": "test-shared-secret"})
+    def test_signed_admin_session_can_be_unlocked(self):
+        self.delete_auth_user("signed.admin@example.com")
+        server.create_user("Signed Admin", "signed.admin@example.com", server.hash_password("secure-password"), "Technology", "Administrator")
+        token = server.create_session("signed.admin@example.com")
+
+        elevated = server.elevated_session_token(token, "20032003")
+        self.assertIsNotNone(elevated)
+        self.assertTrue(server.session_user(elevated)["admin_unlocked"])
+        self.assertIsNone(server.elevated_session_token(token, "wrong-password"))
+        self.delete_auth_user("signed.admin@example.com")
+
     def test_admin_unlock_sets_session_flag_only_with_password(self):
         self.delete_auth_user("admin.unlock@example.com")
         server.create_user("Admin Unlock", "admin.unlock@example.com", server.hash_password("secure-password"), "Technology", "Administrator")

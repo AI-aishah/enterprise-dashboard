@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import json
+import base64
+import hashlib
+import hmac
 import os
 import random
 import re
@@ -550,6 +553,19 @@ def authenticate_user(email: str, password: str) -> sqlite3.Row | None:
 
 
 def create_session(email: str) -> str:
+    signing_key = session_signing_key()
+    if signing_key:
+        user = user_by_email(email)
+        if user is None:
+            raise ValueError("User not found")
+        return encode_session({
+            "email": user["email"],
+            "name": user["name"],
+            "department": user["department"],
+            "role": user["role"],
+            "expires_at": int(time.time()) + SESSION_TTL_SECONDS,
+            "admin_unlocked": False,
+        }, signing_key)
     token = secrets.token_urlsafe(32)
     with SESSION_LOCK:
         SESSIONS[token] = {"email": normalize_email(email), "expires_at": time.time() + SESSION_TTL_SECONDS, "admin_unlocked": False}
@@ -559,6 +575,9 @@ def create_session(email: str) -> str:
 def session_record(token: str | None) -> dict[str, Any] | None:
     if not token:
         return None
+    signing_key = session_signing_key()
+    if signing_key and token.startswith("v1."):
+        return decode_session(token, signing_key)
     with SESSION_LOCK:
         session = SESSIONS.get(token)
         if not session:
@@ -574,6 +593,14 @@ def session_user(token: str | None) -> dict[str, str] | None:
     session = session_record(token)
     if session is None:
         return None
+    if all(key in session for key in ("email", "name", "department", "role")):
+        return {
+            "email": session["email"],
+            "name": session["name"],
+            "department": session["department"],
+            "role": session["role"],
+            "admin_unlocked": bool(session.get("admin_unlocked")),
+        }
     email = session["email"]
     user = user_by_email(email)
     if user is None:
@@ -586,6 +613,8 @@ def unlock_admin_session(token: str | None, password: str) -> bool:
         return False
     if not token:
         return False
+    if token.startswith("v1."):
+        return session_record(token) is not None
     with SESSION_LOCK:
         session = SESSIONS.get(token)
         if not session:
@@ -600,6 +629,56 @@ def destroy_session(token: str | None) -> None:
         return
     with SESSION_LOCK:
         SESSIONS.pop(token, None)
+
+
+def session_signing_key() -> bytes | None:
+    """Return a stable secret shared by all serverless function instances."""
+    secret = os.environ.get("SESSION_SECRET", "").strip()
+    if not secret and os.environ.get("VERCEL"):
+        secret = (
+            os.environ.get("GEMINI_API_KEY", "").strip()
+            or os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "").strip()
+        )
+    return hashlib.sha256(f"enterprise-dashboard-session:{secret}".encode()).digest() if secret else None
+
+
+def encode_session(payload: dict[str, Any], signing_key: bytes) -> str:
+    body = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
+    ).rstrip(b"=").decode()
+    signature = hmac.new(signing_key, body.encode(), hashlib.sha256).hexdigest()
+    return f"v1.{body}.{signature}"
+
+
+def decode_session(token: str, signing_key: bytes) -> dict[str, Any] | None:
+    try:
+        version, body, signature = token.split(".", 2)
+        expected = hmac.new(signing_key, body.encode(), hashlib.sha256).hexdigest()
+        if version != "v1" or not hmac.compare_digest(signature, expected):
+            return None
+        padding = "=" * (-len(body) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(body + padding))
+        if not isinstance(payload, dict) or time.time() > float(payload.get("expires_at", 0)):
+            return None
+        if payload.get("role") not in ROLE_OPTIONS:
+            return None
+        return payload
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
+
+def elevated_session_token(token: str | None, password: str) -> str | None:
+    if str(password or "") != ADMIN_UNLOCK_PASSWORD or not token:
+        return None
+    signing_key = session_signing_key()
+    if signing_key and token.startswith("v1."):
+        session = decode_session(token, signing_key)
+        if session is None:
+            return None
+        session["admin_unlocked"] = True
+        session["expires_at"] = int(time.time()) + SESSION_TTL_SECONDS
+        return encode_session(session, signing_key)
+    return token if unlock_admin_session(token, password) else None
 
 
 def find_workspace() -> Path:
@@ -1337,10 +1416,11 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if user["role"] != "Administrator":
                 self.send_json(403, {"error": "Administrator access required"})
                 return
-            if not unlock_admin_session(self.session_token(), payload.get("password", "")):
+            token = elevated_session_token(self.session_token(), payload.get("password", ""))
+            if token is None:
                 self.send_json(401, {"error": "Invalid admin password"})
                 return
-            self.send_json(200, {"ok": True, "message": "Admin access granted"})
+            self.send_json_with_session(200, {"ok": True, "message": "Admin access granted"}, token)
             return
         if path == "/auth/request-otp":
             payload = self.read_json_body()
