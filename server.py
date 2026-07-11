@@ -30,5 +30,7 @@ sys.path.insert(0, str(CHATBOT_DIR))
 from chatbot.server import DashboardHandler  # noqa: E402
 
 
-# Vercel discovers BaseHTTPRequestHandler subclasses exported as `handler`.
-handler = DashboardHandler
+# Keep this as an explicit class declaration: Vercel's static entrypoint
+# detector does not recognize an imported class assigned to an alias.
+class handler(DashboardHandler):
+    """Handle all dashboard routes in a Vercel Python Function."""
