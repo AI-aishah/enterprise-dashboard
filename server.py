@@ -34,3 +34,16 @@ from chatbot.server import DashboardHandler  # noqa: E402
 # detector does not recognize an imported class assigned to an alias.
 class handler(DashboardHandler):
     """Handle all dashboard routes in a Vercel Python Function."""
+
+    def _normalize_vercel_path(self) -> None:
+        """Translate Vercel's internal function mount path to the site root."""
+        if self.path in {"/server", "/server.py"}:
+            self.path = "/"
+
+    def do_GET(self) -> None:
+        self._normalize_vercel_path()
+        super().do_GET()
+
+    def do_POST(self) -> None:
+        self._normalize_vercel_path()
+        super().do_POST()
